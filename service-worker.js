@@ -1,18 +1,20 @@
-const CACHE_NAME = "quinta-fr-v4";
+const CACHE_NAME = "quinta-fr-v11";
 
-const ASSETS = [
-"./",
+// 1. Core App Shell (Lightweight - installs in <300ms)
+const CORE_ASSETS = [
+  "./",
   "./index.html",
-  "./quinta.geojson",
   "./manifest.json",
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+  "./FR_LA QUINTA.html",
   "./icon-192.png",
   "./icon-512.png",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  "./quinta.geojson"
 ];
 
 const AUDIO_URLS = [
-"https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/0.mp3",
+  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/0.mp3",
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/1.mp3",
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/2.mp3",
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/3.mp3",
@@ -24,8 +26,8 @@ const AUDIO_URLS = [
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/9.mp3"
 ];
 
-const TILES = [
-"./tiles/11/927/854.png",
+const TILE_URLS = [
+  "./tiles/11/927/854.png",
   "./tiles/11/927/855.png",
   "./tiles/11/927/856.png",
   "./tiles/11/927/857.png",
@@ -392,54 +394,20 @@ const TILES = [
   "./tiles/18/119067/109466.png"
 ];
 
-// 1. INSTALL: Pre-cache static assets, audio files, and map tiles for 100% offline use
+// 1. INSTALL: Instant installation of core app shell
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log("[SW] Pre-caching static assets...");
-      await cache.addAll(ASSETS).catch(err => console.warn("[SW] Asset pre-cache warning:", err));
-      
-      // Pre-fetch all audio files with clean GET requests
-      console.log("[SW] Pre-caching audio files...");
-      for (const url of AUDIO_URLS) {
-        try {
-          const req = new Request(url, { method: "GET" });
-          const res = await fetch(req);
-          if (res && res.status === 200) {
-            await cache.put(url, res);
-          }
-        } catch (err) {
-          console.warn("[SW] Audio pre-cache warning for:", url, err);
-        }
-      }
-
-      // Pre-fetch all map tiles individually (so 1 missing tile never breaks the rest)
-      if (TILES.length > 0) {
-        console.log("[SW] Pre-caching map tiles (" + TILES.length + " tiles)...");
-        for (const tileUrl of TILES) {
-          try {
-            const req = new Request(tileUrl, { method: "GET" });
-            const res = await fetch(req);
-            if (res && res.status === 200) {
-              await cache.put(tileUrl, res);
-              // Also store under relative path
-              if (tileUrl.startsWith("./")) {
-                const cleanRel = tileUrl.substring(1);
-                const fullAbs = self.location.origin + self.location.pathname.replace(/[^/]*$/, "") + cleanRel.substring(1);
-                await cache.put(fullAbs, res.clone());
-              }
-            }
-          } catch (err) {
-            // Ignore single tile fetch warnings
-          }
-        }
-      }
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log("[SW] Pre-caching core app shell...");
+      return cache.addAll(CORE_ASSETS).catch((err) => {
+        console.warn("[SW] App shell pre-cache warning:", err);
+      });
     })
   );
 });
 
-// 2. ACTIVATE: Clean old caches & claim clients immediately
+// 2. ACTIVATE: Clean old caches, claim clients & run parallel background pre-cache
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
@@ -450,34 +418,80 @@ self.addEventListener("activate", (e) => {
       )
     ).then(() => self.clients.claim())
   );
+
+  // Background caching of all audio files & map tiles (non-blocking)
+  preCacheOfflineContent();
 });
 
-// 3. FETCH: Smart Cache handler for Audio (Range requests) and Map Tiles
+// Message listener for skip waiting
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+// Fast parallel batch precaching function
+async function preCacheOfflineContent() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    console.log("[SW] Starting background precache for tiles and audio...");
+
+    // Helper for fast parallel batch fetch
+    async function fetchBatch(urls, batchSize) {
+      for (let i = 0; i < urls.length; i += batchSize) {
+        const batch = urls.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (url) => {
+            try {
+              const req = url.endsWith(".mp3") ? new Request(url, { method: "GET" }) : url;
+              const res = await fetch(req);
+              if (res && res.status === 200) {
+                await cache.put(url, res);
+              }
+            } catch (err) {
+              // Silently ignore individual tile/audio network glitches
+            }
+          })
+        );
+      }
+    }
+
+    // Pre-cache all audio MP3 files (3 at a time)
+    await fetchBatch(AUDIO_URLS, 3);
+    // Pre-cache all map tile PNGs (15 at a time)
+    await fetchBatch(TILE_URLS, 15);
+
+    console.log("[SW] Background precache complete! Notifying app...");
+
+    // Notify all open client tabs/windows
+    const clientsList = await self.clients.matchAll();
+    for (const client of clientsList) {
+      client.postMessage({ type: "CACHE_COMPLETE" });
+    }
+  } catch (err) {
+    console.warn("[SW] Background precache warning:", err);
+  }
+}
+
+// 3. FETCH: Smart Cache-First for Assets/Tiles + HTTP Range Request Handler for Audios
 self.addEventListener("fetch", (e) => {
   const url = e.request.url;
 
-  // A. Intercept audio requests (MP3s) or Supabase audio storage URLs
+  // Audio Range Request Handler for HTML5 Audio (iOS & Android)
   if (url.endsWith(".mp3") || url.includes("supabase.co/storage/v1/object/public/")) {
     e.respondWith(handleAudioFetch(e.request));
     return;
   }
 
-  // B. Intercept Map Tiles requests (/tiles/)
-  if (url.includes("/tiles/")) {
-    e.respondWith(handleTileFetch(e.request));
-    return;
-  }
-
-  // C. Standard static assets
+  // Cache-First strategy for Map Tiles & App Assets
   e.respondWith(
     caches.match(e.request).then((cachedRes) => {
       if (cachedRes) return cachedRes;
       return fetch(e.request).then((netRes) => {
-        if (!netRes || netRes.status !== 200) {
-          return netRes;
+        if (netRes && netRes.status === 200) {
+          const resToCache = netRes.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resToCache));
         }
-        const resToCache = netRes.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, resToCache));
         return netRes;
       }).catch(() => {
         if (e.request.mode === "navigate") {
@@ -488,36 +502,7 @@ self.addEventListener("fetch", (e) => {
   );
 });
 
-// Helper: Handle Map Tiles offline fetching & URL matching
-async function handleTileFetch(request) {
-  const cache = await caches.open(CACHE_NAME);
-  
-  // 1. Check exact request match
-  let cached = await cache.match(request);
-  if (cached) return cached;
-
-  // 2. Check by relative tile path (./tiles/z/x/y.png)
-  const tilePart = request.url.substring(request.url.indexOf("/tiles/"));
-  const relTilePath = "." + tilePart;
-  cached = await cache.match(relTilePath);
-  if (cached) return cached;
-
-  // 3. If online, fetch and cache
-  try {
-    const netRes = await fetch(request);
-    if (netRes && netRes.status === 200) {
-      await cache.put(request, netRes.clone());
-      await cache.put(relTilePath, netRes.clone());
-    }
-    return netRes;
-  } catch (err) {
-    console.warn("[SW] Tile offline & not cached:", request.url);
-    // Return empty transparent 256x256 PNG if tile missing offline
-    return new Response("", { status: 404 });
-  }
-}
-
-// Helper: Handle HTTP Range Requests for cached audio files (iOS Safari & Android Chrome)
+// Helper: Handle HTTP Range Requests for cached audio files
 async function handleAudioFetch(request) {
   const cache = await caches.open(CACHE_NAME);
   let response = await cache.match(request.url);
