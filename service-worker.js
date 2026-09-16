@@ -7,10 +7,10 @@ const CORE_ASSETS = [
   "./manifest.json",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
-  "./FR_LA QUINTA.html",
+  "./quinta.geojson",
   "./icon-192.png",
   "./icon-512.png",
-  "./quinta.geojson"
+  "./FR_LA QUINTA.html"
 ];
 
 const AUDIO_URLS = [
@@ -19,11 +19,7 @@ const AUDIO_URLS = [
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/2.mp3",
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/3.mp3",
   "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/4.mp3",
-  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/5.mp3",
-  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/6.mp3",
-  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/7.mp3",
-  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/8.mp3",
-  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/9.mp3"
+  "https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/5.mp3"
 ];
 
 const TILE_URLS = [
