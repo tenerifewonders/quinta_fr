@@ -17,19 +17,170 @@
   <style>
     body { margin: 0; font-family: sans-serif; padding-bottom: 60px; }
     #map { height: 50vh; width: 100%; }
-    #audio-list { padding: 15px; list-style: none; margin: 0; }
-    #audio-list li { padding: 12px; border-bottom: 1px solid #ddd; cursor: pointer; transition: all 0.2s ease; }
-    #audio-list li:hover { background: #f0f0f0; }
-    #audio-list li.active-track {
-      background: #e3f2fd;
-      border-left: 5px solid #007bff;
-      font-weight: bold;
-      color: #0056b3;
+    /* Base Audio List Container */
+    #audio-list {
+      padding: 15px;
+      list-style: none;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 600px;
     }
+    #audio-list li {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    /* Active Track Highlight */
+    #audio-list li.active-track {
+      background: #e0f2fe !important;
+      border-left: 5px solid #0284c7 !important;
+    }
+
+    /* OPTION 1: Spotify / App Playlist Style */
+    .track-opt1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .track-opt1:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+    .track-opt1 .track-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+      color: #1e293b;
+      font-size: 14px;
+    }
+    .track-opt1 .play-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #eff6ff;
+      color: #0284c7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .track-opt1 .track-arrow {
+      color: #94a3b8;
+      font-size: 16px;
+    }
+
     #audio-player { width: 100%; position: fixed; bottom: 0; left: 0; z-index: 9999; }
     .marker-active {
       filter: hue-rotate(140deg) saturate(2.5) brightness(0.9) !important;
       z-index: 1000 !important;
+    }
+
+    /* Action Buttons (Pill Style) */
+    .action-bar-wrapper {
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      padding: 12px 15px;
+    }
+    .action-bar {
+      display: flex;
+      gap: 12px;
+      max-width: 520px;
+      margin: 0;
+    }
+    .action-btn {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #eef2f6;
+      color: #1e293b;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 25px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .action-btn:hover {
+      background: #f0f0f0;
+      border-color: #cbd5e1;
+    }
+    .action-btn:active {
+      transform: scale(0.97);
+      background: #dbe2ea;
+    }
+    .action-btn small {
+      display: block;
+      font-weight: 400;
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.2;
+      margin-top: 1px;
+    }
+    .maps-btn { border-left: 3px solid #4285f4; }
+    .tips-btn { border-left: 3px solid #f59e0b; }
+
+    /* Discreet Collapsible Installation Banner */
+    .install-banner {
+      margin: 8px 15px;
+      padding: 6px 12px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #334155;
+      max-width: 520px;
+    }
+    .install-banner summary {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: #1e293b;
+      outline: none;
+      user-select: none;
+      list-style: none;
+    }
+    .install-banner summary::-webkit-details-marker {
+      display: none;
+    }
+    .install-banner summary .plus-icon {
+      font-size: 11px;
+      transition: transform 0.2s ease;
+      color: #475569;
+    }
+    .install-banner[open] summary .plus-icon {
+      transform: rotate(45deg);
+    }
+    .install-banner .install-steps {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #fcd34d;
+      font-weight: 400;
+      font-size: 11.5px;
+      color: #475569;
+      line-height: 1.5;
+    }
+    .install-banner .install-steps div {
+      margin-bottom: 4px;
+    }
+    .install-banner .install-steps div:last-child {
+      margin-bottom: 0;
     }
   </style>
 
@@ -103,36 +254,92 @@
 
   <div id="map"></div>
 
-  <p style="padding: 5px 15px; margin: 5px 0;"> 📍
-    <!-- Google Maps Official (Fuerza caminar y añade todas las paradas en ruta sin fallar) -->
-    <a href="https://www.google.com/maps/dir/?api=1&origin=28.4307331,-16.4913284&destination=28.4361456,-16.4963526&waypoints=28.431655,-16.4922505%7C28.4379028,-16.4927503%7C28.4370121,-16.4965031&travelmode=walking" 
-       target="_blank">
-       Itinéraire Google Maps disponible
-     </a>
-     <span>(connexion de données requise)</span>
-  </p>
+  <div class="action-bar-wrapper">
+    <div class="action-bar">
+      <!-- Google Maps Official -->
+      <a href="https://www.google.com/maps/dir/?api=1&origin=28.4307331,-16.4913284&destination=28.4361456,-16.4963526&waypoints=28.431655,-16.4922505%7C28.4379028,-16.4927503%7C28.4370121,-16.4965031&travelmode=walking" 
+         target="_blank" class="action-btn maps-btn">
+        <span>📍</span>
+        <span>Google Maps <small>(données requises)</small></span>
+      </a>
 
-  <p style="padding: 5px 15px; margin: 5px 0;"> 📄
-    <a href="FR-LA-QUINTA.html" target="_blank">
-       Horaires d'ouverture et conseils pratiques
-    </a>
-  </p>
-
-  <div id="android-msg" style="display:none; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; margin: 10px;">
-    ➕ <strong>Pour installer l'application sur Android et l'utiliser hors ligne : Cliquez sur le menu du navigateur (trois points) → Ajouter à l'écran d'accueil / Installer</strong>
+      <a href="FR-LA-QUINTA.html" target="_blank" class="action-btn tips-btn">
+        <span>⭐️</span>
+        <span>Conseils pratiques</span>
+      </a>
+    </div>
   </div>
 
-  <div id="ios-msg" style="display:none; padding: 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; margin: 10px;">
-    ➕ <strong>Pour installer l'application sur votre iPhone et l'utiliser hors ligne : Partager → Sur l'écran d'accueil</strong>
-  </div>
+  <details id="android-msg" class="install-banner" style="display:none;">
+    <summary>
+      <span class="plus-icon">➕</span>
+      <span>Installation hors ligne</span>
+    </summary>
+    <div class="install-steps">
+      <div>Ouvrir le menu du navigateur ( ⁝ 3 points en haut à droite)</div>
+      <div>Sélectionner « Ajouter à l'écran d'accueil » ou « Installer »</div>
+    </div>
+  </details>
+
+  <details id="ios-msg" class="install-banner" style="display:none;">
+    <summary>
+      <span class="plus-icon">➕</span>
+      <span>Installation hors ligne</span>
+    </summary>
+    <div class="install-steps">
+      <div>Appuyer sur le bouton Partager ( ⎋ carré avec flèche)</div>
+      <div>Défiler et sélectionner « Sur l'écran d'accueil »</div>
+    </div>
+  </details>
   
   <ul id="audio-list">
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/0.mp3">0. Une courte introduction à notre itinéraire</li>
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/1.mp3">1. La Giganta – L’éternelle gardienne</li>
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/2.mp3">2. Barranco de la Cruz – Les chemins de la guerre</li>
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/3.mp3">3. Mirador Callado Blanco – L’île errante</li>
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/4.mp3">4. Búnker de Santa Úrsula – La voix des pierres</li>
-    <li data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/5.mp3">5. Mirador de La Quinta Roja – Le royaume intérieur</li>
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/0.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>0. Une courte introduction à notre itinéraire</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
+
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/1.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>1. La Giganta – L'éternelle gardienne</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
+
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/2.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>2. Barranco de la Cruz – Les chemins de la guerre</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
+
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/3.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>3. Mirador Callado Blanco – L'île errante</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
+
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/4.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>4. Búnker de Santa Úrsula – La voix des pierres</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
+
+    <li class="track-opt1" data-audio="https://xzymbvnljudyypdyuisf.supabase.co/storage/v1/object/public/quinta_fr/5.mp3">
+      <div class="track-left">
+        <span class="play-badge">▶</span>
+        <span>5. Mirador de La Quinta Roja – Le royaume intérieur</span>
+      </div>
+      <span class="track-arrow">›</span>
+    </li>
   </ul>
 
   <audio id="audio-player" controls controlsList="nodownload"></audio>
